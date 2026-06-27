@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/4DLDXhio/',
+    base: '/hnc.vn/',
 
     plugins: [react(), tailwindcss()],
 
