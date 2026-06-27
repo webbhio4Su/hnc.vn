@@ -1,0 +1,106 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- User Profiles ---
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && 
+        incoming().keys().hasAll(['name', 'email', 'role', 'uid', 'createdAt', 'updatedAt']) &&
+        incoming().uid == userId &&
+        incoming().role in ['student', 'teacher', 'parent', 'admin', 'user'] &&
+        incoming().name is string && incoming().name.size() <= 100;
+        
+      allow update: if isSignedIn();
+
+      // Sub-collection for friends
+      match /friends/{friendId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) || isOwner(friendId);
+      }
+    }
+
+    // --- Posts ---
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && 
+        isValidId(postId) &&
+        incoming().authorId == request.auth.uid &&
+        incoming().content is string && incoming().content.size() <= 1000;
+      allow update, delete: if isSignedIn() && existing().authorId == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && incoming().authorId == request.auth.uid;
+        allow delete: if isSignedIn() && (existing().authorId == request.auth.uid || get(/databases/$(database)/documents/posts/$(postId)).data.authorId == request.auth.uid);
+      }
+    }
+
+    // --- Conversations & Messages ---
+    match /chats/{chatId} {
+      // ChatId is usually "uid1_uid2"
+      function isParticipant() {
+        return isSignedIn() && (request.auth.uid in chatId.split('_'));
+      }
+
+      allow read: if isParticipant();
+      
+      match /messages/{msgId} {
+        allow read: if isParticipant();
+        allow create: if isParticipant() && incoming().senderId == request.auth.uid;
+      }
+    }
+
+    // --- Matches ---
+    match /matches/{matchId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && (request.auth.uid in resource.data.players.keys());
+    }
+
+    // --- Notifications ---
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+    // --- Transactions ---
+    match /transactions/{transactionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+
+    // --- Connectivity check path ---
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

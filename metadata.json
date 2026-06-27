@@ -1,0 +1,6 @@
+{
+  "name": "Học Tốt Lớp 5 - Toàn Diện",
+  "description": "Nền tảng học tập toàn diện cho học sinh lớp 5: Toán, Tiếng Việt, Khoa học, Lịch sử, Địa lý và Tin học với bài tập tương tác.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": []
+}
